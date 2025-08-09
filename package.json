@@ -1,0 +1,33 @@
+{
+  "name": "react-hook-form-ai",
+  "version": "1.0.0",
+  "description": "A wrapper package over React Hook Form that enables AI features like auto-fill and form summarization using the browser's built-in LLM.",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "keywords": [
+    "react",
+    "hook",
+    "form",
+    "ai",
+    "autofill",
+    "summarization"
+  ],
+  "author": "Saad Ahmed Bazaz",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^17.0.0",
+    "react-hook-form": "^7.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.0.0",
+    "jest": "^26.0.0",
+    "@types/jest": "^26.0.0"
+  },
+  "peerDependencies": {
+    "react": "^17.0.0",
+    "react-dom": "^17.0.0"
+  }
+}
