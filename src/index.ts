@@ -27,3 +27,5 @@ export const useFormAI = (options) => {
         register,
     };
 };
+
+export * from 'react-hook-form';
