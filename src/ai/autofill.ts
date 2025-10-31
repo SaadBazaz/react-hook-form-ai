@@ -7,7 +7,7 @@ export function enableAutoFill(formData: Record<string, any>, context: string): 
     const autoFillData = generateAutoFillData(formData, context);
     
     for (const [key, value] of Object.entries(autoFillData)) {
-        const input = document.querySelector(`input[name="${key}"]`);
+        const input = document.querySelector(`input[name="${key}"]`) as HTMLInputElement;
         if (input) {
             input.value = value;
         }

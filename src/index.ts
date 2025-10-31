@@ -1,31 +1,12 @@
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { enableAutoFill } from './ai/autofill';
-import { generateFormSummary } from './ai/summarize';
-import { FormData } from './types';
+// Main exports
+export { useForm } from './useForm';
+export type { 
+  UseFormAIReturn, 
+  AIFormOptions 
+} from './types';
 
-export const useFormAI = (options) => {
-    const formMethods = useForm<FormData>(options);
-
-    const { register, handleSubmit, setValue, watch } = formMethods;
-
-    // Enable auto-fill feature
-    enableAutoFill(watch, setValue);
-
-    // Function to handle form submission
-    const onSubmit: SubmitHandler<FormData> = (data) => {
-        console.log('Form Data:', data);
-        const summary = generateFormSummary(data);
-        console.log('Form Summary:', summary);
-    };
-
-    return {
-        ...formMethods,
-        handleSubmit: (callback) => handleSubmit((data) => {
-            onSubmit(data);
-            callback(data);
-        }),
-        register,
-    };
-};
-
+// Re-export everything from react-hook-form
 export * from 'react-hook-form';
+
+// Version info
+export const version = '1.0.0';
