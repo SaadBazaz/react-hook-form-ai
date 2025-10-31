@@ -7,7 +7,9 @@ import {
   UseFormRegisterReturn,
 } from "react-hook-form";
 import { useAIAssistant } from "./utils/useAIAssistant";
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useOptionalAIFormContext } from "./AIFormProvider";
+import { useCallback, useRef, useState, useEffect, useMemo } from "react";
+import type { AIProvider, AIProviderType } from "./types";
 
 /**
  * AI configuration options for the form
@@ -23,6 +25,12 @@ export interface AIFormOptions {
   excludeFields?: string[];
   /** Auto-check availability on mount */
   autoCheckAvailability?: boolean;
+  /** Override providers from AIFormProvider */
+  providers?: AIProvider[];
+  /** Override execution order from AIFormProvider */
+  executionOrder?: AIProviderType[];
+  /** Override fallback behavior from AIFormProvider */
+  fallbackOnError?: boolean;
 }
 
 /**
@@ -84,14 +92,43 @@ export function useForm<T extends FieldValues>(
   }
 ): UseFormAIReturn<T> {
   const { ai: aiOptions, ...rhfOptions } = options || {};
+  const providerContext = useOptionalAIFormContext();
   
+  // Merge provider context with local options (local options take precedence)
+  const mergedConfig = useMemo(() => {
+    const {
+      enabled: localEnabled,
+      apiUrl,
+      debounceMs: localDebounce,
+      excludeFields: localExclude,
+      autoCheckAvailability = true,
+      providers: localProviders,
+      executionOrder: localOrder,
+      fallbackOnError: localFallback,
+    } = aiOptions || {};
+
+    return {
+      enabled: localEnabled ?? providerContext?.enabled ?? true,
+      apiUrl: apiUrl ?? 'http://localhost:3001',
+      debounceMs: localDebounce ?? providerContext?.debounceMs ?? 800,
+      excludeFields: localExclude ?? providerContext?.excludeFields ?? [],
+      autoCheckAvailability,
+      providers: localProviders ?? providerContext?.providers,
+      executionOrder: localOrder ?? providerContext?.executionOrder,
+      fallbackOnError: localFallback ?? providerContext?.fallbackOnError ?? true,
+    };
+  }, [aiOptions, providerContext]);
+
   const {
-    enabled: aiEnabled = true,
-    apiUrl = 'http://localhost:3001',
-    debounceMs = 800,
-    excludeFields = [],
-    autoCheckAvailability = true,
-  } = aiOptions || {};
+    enabled: aiEnabled,
+    apiUrl,
+    debounceMs,
+    excludeFields,
+    autoCheckAvailability,
+    providers,
+    executionOrder,
+    fallbackOnError,
+  } = mergedConfig;
 
   const form = useReactHookForm<T>(rhfOptions);
   const [aiLoading, setAiLoading] = useState(false);
@@ -108,11 +145,14 @@ export function useForm<T extends FieldValues>(
   // Get current form values for context
   const formValues = form.watch();
 
-  // Initialize AI assistant with form context
+  // Initialize AI assistant with form context and overrides
   const ai = useAIAssistant({
     enabled: aiEnabled,
     formContext: formValues,
     apiUrl,
+    providers,
+    executionOrder,
+    fallbackOnError,
   });
 
   // Check availability on mount
