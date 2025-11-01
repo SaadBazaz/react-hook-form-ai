@@ -1,10 +1,4 @@
-type AutofillData = Record<string, string>;
-
-interface AIAssistantOptions {
-  enabled?: boolean;
-  formContext?: Record<string, any>;
-  apiUrl?: string; // Your server URL
-}
+import { AIAssistantOptions, AutofillData } from "../types";
 
 /**
  * AI Assistant Hook — uses Chrome Built-in AI when available,
@@ -18,18 +12,56 @@ export function useAIAssistant({
   // ------------------------------------------
   // Chrome Built-in AI (Primary)
   // ------------------------------------------
-  async function useChromeAI(prompt: string): Promise<string | null> {
-    if (typeof window === "undefined" || !("ai" in window)) return null;
-    const ai = (window as any).ai;
-
-    if (!ai?.languageModel?.create) return null;
+  async function useChromeAI(
+    prompt: string,
+    options?: { 
+      onDownloadProgress?: (progress: number) => void;
+      signal?: AbortSignal;
+    }
+  ): Promise<string | null> {
+    if (typeof window === "undefined" || typeof LanguageModel === "undefined") {
+      return null;
+    }
 
     try {
-      const session = await ai.languageModel.create();
-      const result = await session.prompt(prompt);
+      // Check availability first
+      const availability = await LanguageModel.availability();
+      
+      if (availability === 'unavailable') {
+        console.log('Chrome AI is unavailable on this device');
+        return null;
+      }
+
+      if (availability === 'downloadable') {
+        console.log('Chrome AI model needs to be downloaded. User interaction required.');
+        // Continue to trigger download
+      }
+
+      if (availability === 'downloading') {
+        console.log('Chrome AI model is currently downloading...');
+      }
+
+      // Create session with download monitoring
+      const session = await LanguageModel.create({
+        monitor(m) {
+          m.addEventListener('downloadprogress', (e) => {
+            const progress = e.loaded * 100;
+            console.log(`Downloaded ${progress.toFixed(2)}%`);
+            options?.onDownloadProgress?.(progress);
+          });
+        },
+        signal: options?.signal,
+      });
+      
+      // Use prompt method
+      const result = await session.prompt(prompt, { signal: options?.signal });
+      
+      // Clean up session when done
+      session.destroy();
+      
       return result;
-    } catch (err) {
-      console.error("Chrome AI error:", err);
+    } catch (err: any) {
+      console.error("Chrome AI error:", err.message || err);
       return null;
     }
   }
@@ -54,8 +86,8 @@ export function useAIAssistant({
 
       const data = await response.json();
       return data.suggestion || data.autofillData || null;
-    } catch (err) {
-      console.error("Server AI error:", err);
+    } catch (err: any) {
+      console.error("Server AI error:", err.message || err);
       return null;
     }
   }
@@ -63,16 +95,24 @@ export function useAIAssistant({
   // ------------------------------------------
   // Suggest Value (Field-specific)
   // ------------------------------------------
-  async function suggestValue(name: string, value: string): Promise<void> {
-    if (!enabled) return;
+  async function suggestValue(name: string, value: string): Promise<string | null> {
+    if (!enabled) return null;
 
-    const prompt = `
-You are assisting with a form. The field name is "${name}".
-Current value: "${value}".
-Form context: ${JSON.stringify(formContext, null, 2)}.
-Please suggest an improved, corrected, or realistic completion for this field.
-Respond with ONLY the suggested value.
-    `;
+    // Improved prompt with clearer instructions
+    const prompt = `You are assisting with form completion. The user is filling out a field named "${name}".
+
+Current value: "${value}"
+Form context: ${JSON.stringify(formContext, null, 2)}
+
+Based on the field name, current value, and form context, suggest an improved, corrected, or realistic completion for this field.
+
+Rules:
+- Respond with ONLY the suggested value
+- No explanations or additional text
+- If the current value is already good, return it as-is
+- Make sure the suggestion is appropriate for the field name
+
+Suggested value:`;
 
     let result = await useChromeAI(prompt);
     
@@ -86,39 +126,56 @@ Respond with ONLY the suggested value.
     }
 
     if (result) {
-      console.log(`✨ AI suggestion for "${name}":`, result);
-    } else {
-      console.warn("No AI suggestion available.");
+      // Clean up the result (remove quotes, trim whitespace)
+      const cleaned = result.trim().replace(/^["']|["']$/g, '');
+      console.log(`✨ AI suggestion for "${name}":`, cleaned);
+      return cleaned;
     }
+    
+    console.warn("No AI suggestion available.");
+    return null;
   }
 
   // ------------------------------------------
   // Auto-fill (Form-wide)
   // ------------------------------------------
-  async function autofill(fields: string[]): Promise<AutofillData> {
+  async function autofill(
+    fields: string[],
+    options?: { onDownloadProgress?: (progress: number) => void }
+  ): Promise<AutofillData> {
     if (!enabled) {
       return Object.fromEntries(fields.map((f) => [f, "AI disabled"])) as AutofillData;
     }
 
-    const prompt = `
-You are an intelligent form assistant.
-Given a form with the following fields: ${fields.join(", ")},
-and this context: ${JSON.stringify(formContext, null, 2)},
-generate a realistic JSON object containing example values for each field.
-Output only valid JSON. Example:
-{"name": "Alice", "email": "alice@example.com", "age": "29"}.
-    `;
+    const prompt = `You are an intelligent form assistant. Generate realistic example values for a form.
 
-    let result = await useChromeAI(prompt);
+Form fields: ${fields.join(", ")}
+Context: ${JSON.stringify(formContext, null, 2)}
+
+Generate realistic, appropriate values for each field based on the field names and context.
+Output ONLY a valid JSON object with these exact field names as keys.
+
+Example format:
+{"name": "Alice Johnson", "email": "alice@example.com", "age": "29"}
+
+JSON object:`;
+
+    let result = await useChromeAI(prompt, {
+      onDownloadProgress: options?.onDownloadProgress,
+    });
     
     if (result) {
       try {
-        const parsed = JSON.parse(result);
-        if (typeof parsed === "object" && parsed !== null) {
-          return parsed;
+        // Try to extract JSON from the response
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (typeof parsed === "object" && parsed !== null) {
+            return parsed;
+          }
         }
-      } catch {
-        console.warn("Chrome AI returned invalid JSON, trying server...");
+      } catch (err) {
+        console.warn("Chrome AI returned invalid JSON, trying server...", err);
       }
     }
 
@@ -128,13 +185,61 @@ Output only valid JSON. Example:
       formContext,
     });
 
-    if (serverResult && typeof serverResult === 'object') {
-      return serverResult as AutofillData;
+    if (serverResult) {
+      try {
+        const parsed = typeof serverResult === 'string' 
+          ? JSON.parse(serverResult) 
+          : serverResult;
+        
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed as AutofillData;
+        }
+      } catch (err) {
+        console.error("Failed to parse server response:", err);
+      }
     }
 
     console.warn("AI unavailable — using fallback mock values.");
-    return Object.fromEntries(fields.map((f) => [f, `AI_${f}`])) as AutofillData;
+    return Object.fromEntries(fields.map((f) => [f, `Example_${f}`])) as AutofillData;
   }
 
-  return { suggestValue, autofill };
+  // ------------------------------------------
+  // Check Availability
+  // ------------------------------------------
+  async function checkAvailability(): Promise<{
+    available: boolean;
+    status: string;
+    needsDownload: boolean;
+  }> {
+    if (typeof window === "undefined" || typeof LanguageModel === "undefined") {
+      return {
+        available: false,
+        status: 'unavailable',
+        needsDownload: false
+      };
+    }
+
+    try {
+      const availability = await LanguageModel.availability();
+      
+      return {
+        available: availability !== 'unavailable',
+        status: availability,
+        needsDownload: availability === 'downloadable'
+      };
+    } catch (err) {
+      console.error("Error checking availability:", err);
+      return {
+        available: false,
+        status: 'error',
+        needsDownload: false
+      };
+    }
+  }
+
+  return { 
+    suggestValue, 
+    autofill,
+    checkAvailability 
+  };
 }

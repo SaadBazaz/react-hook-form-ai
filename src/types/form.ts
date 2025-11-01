@@ -31,3 +31,11 @@ export interface UseFormAIReturn<T extends FieldValues> extends UseFormReturn<T>
   /** Check if AI is currently processing */
   aiLoading: boolean;
 }
+
+export interface AIAssistantOptions {
+  enabled?: boolean;
+  formContext?: Record<string, any>;
+  apiUrl?: string;
+}
+
+export type AutofillData = Record<string, string>;
