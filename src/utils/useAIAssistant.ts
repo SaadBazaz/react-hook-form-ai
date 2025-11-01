@@ -1,6 +1,6 @@
 import { useOptionalAIFormContext } from '../AIFormProvider';
 import { executeAIProviders } from '../aiProviders';
-import type { AIResponse, AIProvider, AIProviderType } from '../types';
+import type { AIProvider, AIProviderType } from '../types';
 import { useMemo } from 'react';
 
 type AutofillData = Record<string, string>;
