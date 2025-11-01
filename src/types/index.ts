@@ -18,3 +18,4 @@ export interface AIFormFeatures {
 
 export * from "./form";
 export * from "./chrome-ai";
+export * from "./ai";
