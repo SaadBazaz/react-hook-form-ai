@@ -1,6 +1,6 @@
 {
   "name": "react-hook-form-ai",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A wrapper package over React Hook Form that enables AI features like auto-fill and form summarization using the browser's built-in LLM.",
   "main": "src/index.ts",
   "scripts": {
@@ -15,8 +15,26 @@
     "autofill",
     "summarization"
   ],
-  "author": "Saad Ahmed Bazaz",
+  "author": "Saad Ahmed Bazaz, Sameed Ilyas",
+  "contributors": [
+    {
+      "name": "Saad Ahmed Bazaz",
+      "url": "https://github.com/saadbazaz"
+    },
+    {
+      "name": "Sameed Ilyas",
+      "url": "https://github.com/sameedilyas"
+    }
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grayhatdevelopers/react-hook-form-ai.git"
+  },
+  "homepage": "https://github.com/grayhatdevelopers/react-hook-form-ai#readme",
+  "bugs": {
+    "url": "https://github.com/grayhatdevelopers/react-hook-form-ai/issues"
+  },
   "dependencies": {
     "react": "^17.0.0",
     "react-hook-form": "^7.0.0"
